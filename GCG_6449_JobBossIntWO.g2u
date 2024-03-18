@@ -1,0 +1,363 @@
+﻿Program.Sub.Preflight.Start
+V.Global.sFail.Declare
+V.Global.sSuccess.Declare
+V.Global.sConn.Declare
+Program.External.Include.Library("450100.lib",False)
+Program.Sub.Preflight.End
+
+Program.Sub.Main.Start
+F.Intrinsic.Control.Try
+Function.Intrinsic.UI.UsePixels ' Allows you to use Pixels instead of Twips throughout
+'TJS, Jan 2022
+'Quote 13276
+'Removing 'QTS' as a constraint
+'Creating log at beginning and end to troubleshoot Task Scheduler problems
+'Removing tools from WO update that were put back
+
+	'TJS, Oct 2021
+	'Customer: Billet CNC, Inc.
+	'Quote: 11394
+	'Business Case: The customer is looking to integrate with their Supply Point Vending Machine to automatically consume tools to GSS WOs and create weekly POs.
+	'A GAB Script will be set up on the TASK SCHEDULER to run nightly. It will query the two vending machine servers for tools issued the previous day and issue those parts to the appropriate WO as Miscellaneous Material (Sequence 995000).
+	'A second GAB script will be setup on the TASK SCHEDULER to run weekly.  It will query the two vending machine servers for tools issued the previous week and generate a PO to a specific vendor for those tools.
+V.Local.sPW.Declare
+V.Local.sSQL.Declare
+V.Local.iCnt.Declare
+V.Local.sStrtDate.Declare
+V.Local.sEndDate.Declare
+
+F.Intrinsic.Control.CallSub(RunStart)
+
+F.Intrinsic.Date.DateAdd("N",-1440,V.Ambient.Date,V.Local.sStrtDate)
+F.Intrinsic.Date.DateAdd("N",-1,V.Ambient.Date,V.Local.sEndDate)
+
+F.Intrinsic.Control.If(V.DataTable.dtConnSettings.Exists)
+	F.Data.DataTable.Close("dtConnSettings")
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.Control.If(V.DataTable.dtIssLog.Exists)
+	F.Data.DataTable.Close("dtIssLog")
+F.Intrinsic.Control.EndIf
+
+'Testing
+'V.Local.sStrtDate.Set("11/20/2021 12:00:00 AM")
+'V.Local.sEndDate.Set("11/20/2021 11:59:00 PM")
+
+F.ODBC.Connection!conts.OpenCompanyConnection
+	F.Data.DataTable.CreateFromSQL("dtConnSettings","conts","Select * from GCG_6449_MX",True)
+F.ODBC.Connection!conts.Close
+
+'Looping to collect from each server individually
+F.Intrinsic.Control.For(V.Local.iCnt,0,V.DataTable.dtConnSettings.RowCount--,1)
+	F.Intrinsic.String.WeakDecryption(V.DataTable.dtConnSettings(V.Local.iCnt).CONN_PW!FieldValTrim,V.Local.sPW)
+	F.Intrinsic.String.Build("Driver={SQL Server};Server={0}\SQLEXPRESS;Database={1};User Id={2};Password={3}",V.DataTable.dtConnSettings(V.Local.iCnt).SERVER_IP!FieldValTrim,V.DataTable.dtConnSettings(V.Local.iCnt).DATABASE!FieldValTrim,V.DataTable.dtConnSettings(V.Local.iCnt).USER_ID!FieldValTrim,V.Local.sPW,V.Global.sConn)
+	
+	F.ODBC.Connection!conSS.OpenConnection(V.Global.sConn)
+	'Collected tools issued from the vending machine the prior day
+	F.Intrinsic.String.Build("select JOBNUMBER,SUPPLIERPARTNUMBER,QTY from sps.dbo.TransactionLog where JOBNUMBER in (select JOBNUMBER from sps.dbo.TransactionLog where TRANENDDATETIME between '{0}' and '{1}' and TRANSCODE = 'WN' group by JOBNUMBER,SUPPLIERPARTNUMBER having SUM(QTY) > 0) and TRANENDDATETIME between '{0}' and '{1}' and TRANSCODE = 'WN' and SUPPLIERPARTNUMBER in (select SUPPLIERPARTNUMBER from sps.dbo.TransactionLog where TRANENDDATETIME between '{0}' and '{1}' and TRANSCODE = 'WN' group by JOBNUMBER,SUPPLIERPARTNUMBER having SUM(QTY) > 0); ",V.Local.sStrtDate,V.Local.sEndDate,V.Local.sSQL)
+	
+	F.Data.DataTable.CreateFromSQL("dtIssLog","conSS",V.Local.sSQL,True)
+
+	F.ODBC.Connection!conSS.Close
+	
+	F.Intrinsic.Control.If(V.DataTable.dtIssLog.RowCount,>,0)
+		F.Intrinsic.Control.CallSub(ProcessMaterial)
+	F.Intrinsic.Control.EndIf	
+	
+	F.Data.DataTable.Close("dtIssLog")
+
+F.Intrinsic.Control.Next(V.Local.iCnt)
+
+F.Intrinsic.Control.CallSub(SendEmail)
+
+F.Intrinsic.Control.CallSub(RunEnd)
+
+F.Intrinsic.Control.End
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(Error,"SubRoutine",V.Ambient.CurrentSubroutine,"eNumber",V.Ambient.ErrorNumber,"eDescription",V.Ambient.ErrorDescription)
+F.Intrinsic.Control.EndTry
+Program.Sub.Main.End
+
+Program.Sub.RunStart.Start
+F.Intrinsic.Control.Try
+V.Local.sProjStart.Declare
+V.Local.iRet.Declare
+V.Local.sSep.Declare
+V.Local.sDirPath.Declare
+V.Local.bDirCheck.Declare
+V.Local.sFilePath.Declare
+V.Local.bFileChk.Declare
+V.Local.sRet.Declare
+V.Local.iCnt.Declare
+
+'Logging start of program for Task Scheduler troubleshooting
+
+F.Intrinsic.String.Build("{0}\CUSTOM\6449",V.Caller.GlobalDir,V.Local.sDirPath)
+
+F.Intrinsic.File.DirExists(V.Local.sDirPath,V.Local.bDirCheck)
+
+F.Intrinsic.Control.If(V.Local.bDirCheck,=,False)
+	F.Intrinsic.File.CreateDir(V.Local.sDirPath)
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.String.Build("-----------------------------------------------------------------------------------------------------------------------------------",,V.Local.sSep)
+F.Intrinsic.String.Build("({1} - {2}){0}WO - GCG_6449_JobBossIntWO Project Started{0}{3}", V.Ambient.NewLine, V.Ambient.Date, V.Ambient.Time,V.Local.sSep,V.Local.sProjStart)
+
+F.Intrinsic.String.Build("{0}\6449_{1}_WO_LOG.txt",V.Local.sDirPath,V.Caller.CompanyCode,V.Local.sFilePath)
+
+F.Intrinsic.File.Exists(V.Local.sFilePath,V.Local.bFileChk)
+
+F.Intrinsic.Control.If(V.Local.bFileChk,=,False)
+	F.Intrinsic.File.String2File(V.Local.sFilePath,V.Local.sProjStart)
+F.Intrinsic.Control.Else
+	F.Intrinsic.File.File2String(V.Local.sFilePath,V.Local.sRet)
+	
+	F.Intrinsic.String.Split(V.Local.sRet,"-----------------------------------------------------------------------------------------------------------------------------------",V.Local.sRet)
+
+	F.Intrinsic.Control.If(V.Local.sRet.UBound,>=,100)
+		F.Intrinsic.Control.For(V.Local.iCnt,V.Local.sRet.UBound,100,-1)
+			F.Intrinsic.Variable.RemoveArrayElementByOrdinal(V.Local.sRet,V.Local.iCnt,V.Local.sRet)	
+		F.Intrinsic.Control.Next(V.Local.iCnt)
+	F.Intrinsic.Control.EndIf
+
+	F.Intrinsic.String.Join(V.Local.sRet,"-----------------------------------------------------------------------------------------------------------------------------------",V.Local.sRet)
+	V.Local.sRet.RedimPreserve(0,0)
+
+	F.Intrinsic.File.String2File(V.Local.sFilePath,V.Local.sRet)
+
+	F.Intrinsic.File.PrependToFileNewline(V.Local.sFilePath,V.Local.sProjStart)
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(Error,"SubRoutine",V.Ambient.CurrentSubroutine,"eNumber",V.Ambient.ErrorNumber,"eDescription",V.Ambient.ErrorDescription)
+F.Intrinsic.Control.EndTry
+Program.Sub.RunStart.End
+
+Program.Sub.RunEnd.Start
+F.Intrinsic.Control.Try
+V.Local.sProjEnd.Declare
+V.Local.iRet.Declare
+V.Local.sSep.Declare
+V.Local.sDirPath.Declare
+V.Local.bDirCheck.Declare
+V.Local.sFilePath.Declare
+V.Local.bFileChk.Declare
+V.Local.sRet.Declare
+V.Local.iCnt.Declare
+
+'Logging end of program for Task Scheduler troubleshooting
+
+F.Intrinsic.String.Build("{0}\CUSTOM\6449",V.Caller.GlobalDir,V.Local.sDirPath)
+
+F.Intrinsic.File.DirExists(V.Local.sDirPath,V.Local.bDirCheck)
+
+F.Intrinsic.Control.If(V.Local.bDirCheck,=,False)
+	F.Intrinsic.File.CreateDir(V.Local.sDirPath)
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.String.Build("-----------------------------------------------------------------------------------------------------------------------------------",,V.Local.sSep)
+F.Intrinsic.String.Build("({1} - {2}){0}WO - GCG_6449_JobBossIntWO Project Ended{0}{3}", V.Ambient.NewLine, V.Ambient.Date, V.Ambient.Time,V.Local.sSep,V.Local.sProjEnd)
+
+F.Intrinsic.String.Build("{0}\6449_{1}_WO_LOG.txt",V.Local.sDirPath,V.Caller.CompanyCode,V.Local.sFilePath)
+
+F.Intrinsic.File.Exists(V.Local.sFilePath,V.Local.bFileChk)
+
+F.Intrinsic.Control.If(V.Local.bFileChk,=,False)
+	F.Intrinsic.File.String2File(V.Local.sFilePath,V.Local.sProjEnd)
+F.Intrinsic.Control.Else
+	F.Intrinsic.File.File2String(V.Local.sFilePath,V.Local.sRet)
+	
+	F.Intrinsic.String.Split(V.Local.sRet,"-----------------------------------------------------------------------------------------------------------------------------------",V.Local.sRet)
+	
+	F.Intrinsic.Control.If(V.Local.sRet.UBound,>=,100)
+		F.Intrinsic.Control.For(V.Local.iCnt,V.Local.sRet.UBound,100,-1)
+			F.Intrinsic.Variable.RemoveArrayElementByOrdinal(V.Local.sRet,V.Local.iCnt,V.Local.sRet)	
+		F.Intrinsic.Control.Next(V.Local.iCnt)
+	F.Intrinsic.Control.EndIf
+
+	F.Intrinsic.String.Join(V.Local.sRet,"-----------------------------------------------------------------------------------------------------------------------------------",V.Local.sRet)
+	V.Local.sRet.RedimPreserve(0,0)
+
+	F.Intrinsic.File.String2File(V.Local.sFilePath,V.Local.sRet)
+
+	F.Intrinsic.File.PrependToFileNewline(V.Local.sFilePath,V.Local.sProjEnd)
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(Error,"SubRoutine",V.Ambient.CurrentSubroutine,"eNumber",V.Ambient.ErrorNumber,"eDescription",V.Ambient.ErrorDescription)
+F.Intrinsic.Control.EndTry
+Program.Sub.RunEnd.End
+
+Program.Sub.ProcessMaterial.Start
+F.Intrinsic.Control.Try
+V.Local.iCnt.Declare
+V.Local.sJobNumber.Declare
+V.Local.sWO.Declare
+V.Local.sWOSuffix.Declare
+V.Local.sSQL.Declare
+V.Local.sQty.Declare
+
+'Validating WO exists.
+F.Data.DataTable.AddColumn("dtIssLog","JOBCHK","String")
+
+F.ODBC.Connection!conts.OpenCompanyConnection
+	F.Data.Dictionary.CreateFromSQL("dictJobs","conts","Select CASE when SUFFIX = '' then JOB else JOB+'-'+RTRIM(SUFFIX) end as JOBSUFFIX,'Y' as VALUE from V_JOB_HEADER;")
+F.ODBC.Connection!conts.Close
+
+F.Data.Dictionary.SetDefaultReturn("dictJobs","N")
+F.Data.DataTable.FillFromDictionary("dtIssLog","dictJobs","JOBNUMBER","JOBCHK")
+F.Data.Dictionary.Close("dictJobs")
+
+F.Data.DataView.Create("dtIssLog","dvIssLog",22)
+
+F.Intrinsic.Control.For(V.Local.iCnt,0,V.DataView.dtIssLog!dvIssLog.RowCount--,1)
+	F.Intrinsic.Control.If(V.DataView.dtIssLog!dvIssLog(V.Local.iCnt).JOBCHK!FieldValTrim,=,"Y")
+		F.Intrinsic.String.Split(V.DataView.dtIssLog!dvIssLog(V.Local.iCnt).JOBNUMBER!FieldValTrim,"-",V.Local.sJobNumber)
+		V.Local.sWO.Set(V.Local.sJobNumber(0))
+		V.Local.sWOSuffix.Set(V.Local.sJobNumber(1))
+		F.Intrinsic.String.Build("{0}.0",V.DataView.dtIssLog!dvIssLog(V.Local.iCnt).QTY!FieldValFloat,V.Local.sQty)
+		'If WO exists, writing to the 450100 callwrapper table.
+		F.Data.DataTable.AddRow("450100","Part",V.DataView.dtIssLog!dvIssLog(V.Local.iCnt).SUPPLIERPARTNUMBER!FieldValTrim,"Quantity",V.Local.sQty,"WONumber",V.Local.sWO,"WOSuffix",V.Local.sWOSuffix,"WOSeq","995000")
+		
+		'Writing out success message body
+		F.Intrinsic.Control.If(V.Global.sSuccess.Trim,=,"")
+			F.Intrinsic.String.Build("The following parts were issued to these Work Orders:{0}{1} each of Part {2} to WO {3}",V.Ambient.NewLine,V.DataView.dtIssLog!dvIssLog(V.Local.iCnt).QTY!FieldValTrim,V.DataView.dtIssLog!dvIssLog(V.Local.iCnt).SUPPLIERPARTNUMBER!FieldValTrim,V.DataView.dtIssLog!dvIssLog(V.Local.iCnt).JOBNUMBER!FieldValTrim,V.Global.sSuccess)
+		F.Intrinsic.Control.Else
+			F.Intrinsic.String.Build("{0}{1}{2} each of Part {3} to WO {4}",V.Global.sSuccess,V.Ambient.NewLine,V.DataView.dtIssLog!dvIssLog(V.Local.iCnt).QTY!FieldValTrim,V.DataView.dtIssLog!dvIssLog(V.Local.iCnt).SUPPLIERPARTNUMBER!FieldValTrim,V.DataView.dtIssLog!dvIssLog(V.Local.iCnt).JOBNUMBER!FieldValTrim,V.Global.sSuccess)
+		F.Intrinsic.Control.EndIf
+		
+	F.Intrinsic.Control.Else
+		'Writing out error message body
+		F.Intrinsic.Control.If(V.Global.sFail.Trim,=,"")
+			F.Intrinsic.String.Build("The following parts could not be issued:{0}{1} each of Part {2} to WO {3}",V.Ambient.NewLine,V.DataView.dtIssLog!dvIssLog(V.Local.iCnt).QTY!FieldValTrim,V.DataView.dtIssLog!dvIssLog(V.Local.iCnt).SUPPLIERPARTNUMBER!FieldValTrim,V.DataView.dtIssLog!dvIssLog(V.Local.iCnt).JOBNUMBER!FieldValTrim,V.Global.sFail)
+		F.Intrinsic.Control.Else
+			F.Intrinsic.String.Build("{0}{1}{2} each of Part {3} to WO {4}",V.Global.sFail,V.Ambient.NewLine,V.DataView.dtIssLog!dvIssLog(V.Local.iCnt).QTY!FieldValTrim,V.DataView.dtIssLog!dvIssLog(V.Local.iCnt).SUPPLIERPARTNUMBER!FieldValTrim,V.DataView.dtIssLog!dvIssLog(V.Local.iCnt).JOBNUMBER!FieldValTrim,V.Global.sFail)
+		F.Intrinsic.Control.EndIf
+	
+	F.Intrinsic.Control.EndIf
+	
+F.Intrinsic.Control.Next(V.Local.iCnt)
+
+F.Data.DataView.Close("dtIssLog","dvIssLog")
+
+F.Intrinsic.Control.If(V.DataTable.450100.RowCount,>,0)
+	F.Intrinsic.Control.CallSub(450100Sync)
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(Error,"SubRoutine",V.Ambient.CurrentSubroutine,"eNumber",V.Ambient.ErrorNumber,"eDescription",V.Ambient.ErrorDescription)
+F.Intrinsic.Control.EndTry
+Program.Sub.ProcessMaterial.End
+
+Program.Sub.SendEmail.Start
+F.Intrinsic.Control.Try
+V.Local.sBody.Declare
+V.Local.iCnt.Declare
+V.Local.sSender.Declare
+V.Local.sRecipients.Declare
+V.Local.iUserID.Declare
+V.Local.sDate.Declare
+V.Local.sSubject.Declare
+
+F.Intrinsic.Date.DateAdd("d",-1,V.Ambient.Date,V.Local.sDate)
+F.Intrinsic.String.Format(V.Local.sDate,"MM/DD/YYYY",V.Local.sDate)
+
+F.Intrinsic.Control.If(V.Global.sSuccess.Trim,<>,"")
+	V.Local.sBody.Set(V.Global.sSuccess.Trim)
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.Control.If(V.Global.sFail.Trim,<>,"")
+	F.Intrinsic.String.Build("{0}{1}{1}{2}",V.Local.sBody,V.Ambient.NewLine,V.Global.sFail.Trim,V.Local.sBody)
+F.Intrinsic.Control.Else
+	F.Intrinsic.Control.If(V.Local.sBody.Trim,=,"")
+		V.Local.sBody.Set(V.Global.sFail.Trim)
+	F.Intrinsic.Control.Else	
+		F.Intrinsic.String.Build("{0}{1}{2}",V.Local.sBody,V.Ambient.NewLine,V.Global.sFail,V.Local.sBody)
+	F.Intrinsic.Control.EndIf	
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.Control.If(V.Local.sBody.Trim,<>,"")
+	F.Global.Security.getuserID(V.Caller.User,V.Caller.CompanyCode,V.Local.iUserID)
+	V.Local.sSender.Set("jake@billetcnc.com*!*Jake Hebert")
+	F.Data.DataView.Create("dtConnSettings","dvEmails",22)
+	F.Data.DataView.ToString("dtConnSettings","dvEmails","MSG_NAME*!*MSG_EMAIL","*!*","@!@",V.Local.sRecipients)
+	
+	F.Intrinsic.Control.If(V.Local.sRecipients.Trim,<>,"")
+		F.Intrinsic.String.Build("ToolBOSS tool withdrawals processed for {0}",V.Local.sDate,V.Local.sSubject)
+		F.Global.Messaging.Queuemessage(V.Caller.CompanyCode,V.Local.iUserID,"",V.Local.sSubject,V.Local.sSender,V.Local.sRecipients,V.Local.sBody)
+	F.Intrinsic.Control.EndIf	
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(Error,"SubRoutine",V.Ambient.CurrentSubroutine,"eNumber",V.Ambient.ErrorNumber,"eDescription",V.Ambient.ErrorDescription)
+F.Intrinsic.Control.EndTry
+Program.Sub.SendEmail.End
+
+Program.Sub.Error.Start
+V.Local.sError.Declare
+V.Local.iRet.Declare
+V.Local.sSep.Declare
+V.Local.sDirPath.Declare
+V.Local.bDirCheck.Declare
+V.Local.sFilePath.Declare
+V.Local.bFileChk.Declare
+V.Local.sConn.Declare
+V.Local.bRedactChk.Declare(Boolean, False)
+V.Local.sRet.Declare
+V.Local.iCnt.Declare
+
+F.Intrinsic.String.Build("{0}\CUSTOM\6449",V.Caller.GlobalDir,V.Local.sDirPath)
+
+F.Intrinsic.File.DirExists(V.Local.sDirPath,V.Local.bDirCheck)
+
+F.Intrinsic.Control.If(V.Local.bDirCheck,=,False)
+	F.Intrinsic.File.CreateDir(V.Local.sDirPath)
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.String.Build("-----------------------------------------------------------------------------------------------------------------------------------",,V.Local.sSep)
+F.Intrinsic.String.Build("({4} - {5}){0}WO - GCG_6449_JobBossIntWO, Sub: {1}{0}Error: {2}, {3}{0}{6}", V.Ambient.NewLine, V.Args.SubRoutine, V.Args.eNumber, V.Args.eDescription,V.Ambient.Date, V.Ambient.Time,V.Local.sSep,V.Local.sError)
+
+F.Intrinsic.String.IsInString(V.Local.sError,V.Global.sConn,True,V.Local.bRedactChk)
+
+F.Intrinsic.Control.If(V.Local.bRedactChk,=,True)
+	F.Intrinsic.String.Split(V.Global.sConn,"\",V.local.sConn)
+	F.Intrinsic.String.Replace(V.Local.sError,V.local.sConn(1),"",V.Local.sError)
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.String.Build("{0}\6449_{1}_WO_LOG.txt",V.Local.sDirPath,V.Caller.CompanyCode,V.Local.sFilePath)
+
+F.Intrinsic.File.Exists(V.Local.sFilePath,V.Local.bFileChk)
+
+F.Intrinsic.Control.If(V.Local.bFileChk,=,False)
+	F.Intrinsic.File.String2File(V.Local.sFilePath,V.Local.sError)
+F.Intrinsic.Control.Else
+	F.Intrinsic.File.File2String(V.Local.sFilePath,V.Local.sRet)
+	
+	F.Intrinsic.String.Split(V.Local.sRet,"-----------------------------------------------------------------------------------------------------------------------------------",V.Local.sRet)
+	
+	F.Intrinsic.Control.If(V.Local.sRet.UBound,>=,100)
+		F.Intrinsic.Control.For(V.Local.iCnt,V.Local.sRet.UBound,100,-1)
+			F.Intrinsic.Variable.RemoveArrayElementByOrdinal(V.Local.sRet,V.Local.iCnt,V.Local.sRet)	
+		F.Intrinsic.Control.Next(V.Local.iCnt)
+	F.Intrinsic.Control.EndIf
+
+	F.Intrinsic.String.Join(V.Local.sRet,"-----------------------------------------------------------------------------------------------------------------------------------",V.Local.sRet)
+	V.Local.sRet.RedimPreserve(0,0)
+
+	F.Intrinsic.File.String2File(V.Local.sFilePath,V.Local.sRet)
+
+	F.Intrinsic.File.PrependToFileNewline(V.Local.sFilePath,V.Local.sError)
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.Control.ClearErrors
+
+F.Intrinsic.Control.CallSub(RunEnd)
+
+F.Intrinsic.Control.End
+Program.Sub.Error.End
+
+Program.Sub.Comments.Start
+${$5$}$3.0.0.0$}$1
+${$6$}$tsmith$}$20220111111613194$}$xqPbj9atw05FglvzeFsZ9cqXP+qvG6tXkDOmqH4rfyX5kI1H1Nd2/WXr4dTgWnO5LOYTkGVrmxE=
+Program.Sub.Comments.End
