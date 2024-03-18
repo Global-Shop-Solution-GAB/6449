@@ -1,0 +1,269 @@
+﻿Program.Sub.ScreenSU.Start
+Gui.fmSettings..Create(BaseForm)
+Gui.fmSettings..Caption("ToolBOSS Integration Settings")
+Gui.fmSettings..Size(857,181)
+Gui.fmSettings..MinX(0)
+Gui.fmSettings..MinY(0)
+Gui.fmSettings..Position(0,0)
+Gui.fmSettings..AlwaysOnTop(False)
+Gui.fmSettings..FontName("Tahoma")
+Gui.fmSettings..FontSize(8.25)
+Gui.fmSettings..ControlBox(True)
+Gui.fmSettings..MaxButton(True)
+Gui.fmSettings..MinButton(True)
+Gui.fmSettings..MousePointer(0)
+Gui.fmSettings..Moveable(True)
+Gui.fmSettings..Sizeable(True)
+Gui.fmSettings..ShowInTaskBar(True)
+Gui.fmSettings..TitleBar(True)
+Gui.fmSettings..Event(UnLoad,fmSettings_UnLoad)
+Gui.fmSettings.txtIP.Create(TextBox,"",True,100,20,0,16,24,True,0,"Tahoma",8.25,,1)
+Gui.fmSettings.txtDB.Create(TextBox,"",True,100,20,0,119,24,True,0,"Tahoma",8.25,,1)
+Gui.fmSettings.txtUser.Create(TextBox,"",True,100,20,0,222,24,True,0,"Tahoma",8.25,,1)
+Gui.fmSettings.txtPW.Create(TextBox,"",True,100,20,0,325,24,True,0,"Tahoma",8.25,,1)
+Gui.fmSettings.txtName.Create(TextBox,"",True,160,20,0,428,24,True,0,"Tahoma",8.25,,1)
+Gui.fmSettings.txtEmail.Create(TextBox,"",True,100,20,0,592,24,True,0,"Tahoma",8.25,,1)
+Gui.fmSettings.lblIP.Create(Label,"Server IP",True,61,16,0,16,7,True,0,"Tahoma",10,,0,0)
+Gui.fmSettings.lblIP.BorderStyle(0)
+Gui.fmSettings.lblIP.FontStyle(True,False,False,False,False)
+Gui.fmSettings.lblDB.Create(Label,"Database",True,62,16,0,119,7,True,0,"Tahoma",10,,0,0)
+Gui.fmSettings.lblDB.BorderStyle(0)
+Gui.fmSettings.lblDB.FontStyle(True,False,False,False,False)
+Gui.fmSettings.lblUser.Create(Label,"User ID",True,47,16,0,222,7,True,0,"Tahoma",10,,0,0)
+Gui.fmSettings.lblUser.BorderStyle(0)
+Gui.fmSettings.lblUser.FontStyle(True,False,False,False,False)
+Gui.fmSettings.lblPW.Create(Label,"Password",True,63,16,0,325,7,True,0,"Tahoma",10,,0,0)
+Gui.fmSettings.lblPW.BorderStyle(0)
+Gui.fmSettings.lblPW.FontStyle(True,False,False,False,False)
+Gui.fmSettings.lblName.Create(Label,"Email Recipient Name",True,135,16,0,428,7,True,0,"Tahoma",10,,0,0)
+Gui.fmSettings.lblName.BorderStyle(0)
+Gui.fmSettings.lblName.FontStyle(True,False,False,False,False)
+Gui.fmSettings.lblEmail.Create(Label,"Email Address",True,90,16,0,592,7,True,0,"Tahoma",10,,0,0)
+Gui.fmSettings.lblEmail.BorderStyle(0)
+Gui.fmSettings.lblEmail.FontStyle(True,False,False,False,False)
+Gui.fmSettings.GsGcSettings.Create(GsGridControl)
+Gui.fmSettings.GsGcSettings.Enabled(True)
+Gui.fmSettings.GsGcSettings.Visible(True)
+Gui.fmSettings.GsGcSettings.Zorder(0)
+Gui.fmSettings.GsGcSettings.Size(832,81)
+Gui.fmSettings.GsGcSettings.Position(16,62)
+Gui.fmSettings.GsGcSettings.Event(RowCellClick,GsGcSettings_RowCellClick)
+Gui.fmSettings.txtRecId.Create(TextBox,"",False,100,20,0,698,2,True,0,"Tahoma",8.25,,1)
+Gui.fmSettings.cmdSv.Create(Button)
+Gui.fmSettings.cmdSv.Enabled(True)
+Gui.fmSettings.cmdSv.Visible(True)
+Gui.fmSettings.cmdSv.Zorder(0)
+Gui.fmSettings.cmdSv.Size(75,23)
+Gui.fmSettings.cmdSv.Position(695,22)
+Gui.fmSettings.cmdSv.Caption("SAVE")
+Gui.fmSettings.cmdSv.FontName("Tahoma")
+Gui.fmSettings.cmdSv.FontSize(10)
+Gui.fmSettings.cmdSv.FontStyle(True,False,False,False,False)
+Gui.fmSettings.cmdSv.Event(Click,cmdSv_Click)
+Gui.fmSettings.cmdSv.BackColor(12648384)
+Gui.fmSettings.cmdDel.Create(Button)
+Gui.fmSettings.cmdDel.Enabled(True)
+Gui.fmSettings.cmdDel.Visible(True)
+Gui.fmSettings.cmdDel.Zorder(0)
+Gui.fmSettings.cmdDel.Size(75,23)
+Gui.fmSettings.cmdDel.Position(773,22)
+Gui.fmSettings.cmdDel.Caption("DELETE")
+Gui.fmSettings.cmdDel.FontName("Tahoma")
+Gui.fmSettings.cmdDel.FontSize(10)
+Gui.fmSettings.cmdDel.FontStyle(True,False,False,False,False)
+Gui.fmSettings.cmdDel.Event(Click,cmdDel_Click)
+Gui.fmSettings.cmdDel.BackColor(12632319)
+Program.Sub.ScreenSU.End
+
+Program.Sub.Preflight.Start
+Program.Sub.Preflight.End
+
+Program.Sub.Main.Start
+F.Intrinsic.Control.Try
+Function.Intrinsic.UI.UsePixels ' Allows you to use Pixels instead of Twips throughout
+V.Local.iCnt.Declare
+V.Local.sFieldNames.Declare
+
+F.Intrinsic.Control.If(V.DataTable.dtSettings.Exists)
+	F.Data.DataTable.Close("dtSettings")
+F.Intrinsic.Control.EndIf
+
+F.ODBC.Connection!conts.OpenCompanyConnection
+	F.Data.DataTable.CreateFromSQL("dtSettings","conts","Select REC_ID,RTRIM(SERVER_IP) as SERVER_IP,RTRIM(DATABASE) as DATABASE,RTRIM(USER_ID) as USER_ID,'********' as PASS,RTRIM(CONN_PW) as CONN_PW,RTRIM(MSG_NAME) as MSG_NAME,RTRIM(MSG_EMAIL) as MSG_EMAIL from GCG_6449_MX",True)
+F.ODBC.Connection!conts.Close
+
+Gui.fmSettings.GsGcSettings.AddGridviewFromDatatable("gvSettings","dtSettings")
+Gui.fmSettings.GsGcSettings.SetGridviewProperty("gvSettings",V.Enum.GridViewPropertyNames!Editable,False)
+Gui.fmSettings.GsGcSettings.SetGridviewProperty("gvSettings",V.Enum.GridViewPropertyNames!ReadOnly,True)
+
+V.Local.sFieldNames.Set(V.DataTable.dtSettings.FieldNames)
+
+F.Intrinsic.String.Split(V.Local.sFieldNames,"*!*",V.Local.sFieldNames)
+
+F.Intrinsic.Control.For(V.Local.iCnt,V.Local.sFieldNames.LBound,V.Local.sFieldNames.UBound,1)
+	Gui.fmSettings.GsGcSettings.SetColumnProperty("gvSettings",V.Local.sFieldNames(V.Local.iCnt),V.Enum.ColumnPropertyNames!HeaderFontBold,True)
+	Gui.fmSettings.GsGcSettings.SetColumnProperty("gvSettings",V.Local.sFieldNames(V.Local.iCnt),V.Enum.ColumnPropertyNames!HeaderHAlignment,"Center")
+F.Intrinsic.Control.Next(V.Local.iCnt)
+
+Gui.fmSettings.GsGcSettings.SetColumnProperty("gvSettings","REC_ID",V.Enum.ColumnPropertyNames!Visible,False)
+Gui.fmSettings.GsGcSettings.SetColumnProperty("gvSettings","CONN_PW",V.Enum.ColumnPropertyNames!Visible,False)
+
+Gui.fmSettings.GsGcSettings.SetColumnProperty("gvSettings","REC_ID",V.Enum.ColumnPropertyNames!AllowShowHide,False)
+Gui.fmSettings.GsGcSettings.SetColumnProperty("gvSettings","CONN_PW",V.Enum.ColumnPropertyNames!AllowShowHide,False)
+
+Gui.fmSettings.GsGcSettings.SetColumnProperty("gvSettings","SERVER_IP",V.Enum.ColumnPropertyNames!Caption,"Server IP Address")
+Gui.fmSettings.GsGcSettings.SetColumnProperty("gvSettings","DATABASE",V.Enum.ColumnPropertyNames!Caption,"Database")
+Gui.fmSettings.GsGcSettings.SetColumnProperty("gvSettings","USER_ID",V.Enum.ColumnPropertyNames!Caption,"User Name")
+Gui.fmSettings.GsGcSettings.SetColumnProperty("gvSettings","PASS",V.Enum.ColumnPropertyNames!Caption,"Password")
+Gui.fmSettings.GsGcSettings.SetColumnProperty("gvSettings","MSG_NAME",V.Enum.ColumnPropertyNames!Caption,"Email Name")
+Gui.fmSettings.GsGcSettings.SetColumnProperty("gvSettings","MSG_EMAIL",V.Enum.ColumnPropertyNames!Caption,"Email Address")
+
+Gui.fmSettings.GsGcSettings.SetColumnProperty("gvSettings","CONN_PW",V.Enum.ColumnPropertyNames!EditMaskType,"None")
+Gui.fmSettings.GsGcSettings.SetColumnProperty("gvSettings","CONN_PW",V.Enum.ColumnPropertyNames!EditMask,"0")
+Gui.fmSettings.GsGcSettings.SetColumnProperty("gvSettings","CONN_PW",V.Enum.ColumnPropertyNames!EditMaskAsDisplayFormat,True)
+
+Gui.fmSettings.GsGcSettings.MainView("gvSettings")
+
+Gui.fmSettings..Show
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(Error,"SubRoutine",V.Ambient.CurrentSubroutine,"eNumber",V.Ambient.ErrorNumber,"eDescription",V.Ambient.ErrorDescription)
+F.Intrinsic.Control.EndTry
+Program.Sub.Main.End
+
+Program.Sub.cmdSv_Click.Start
+F.Intrinsic.Control.Try
+V.Local.sRecID.Declare
+V.Local.sIP.Declare
+V.Local.sDB.Declare
+V.Local.sUser.Declare
+V.Local.sPW.Declare
+V.Local.sEName.Declare
+V.Local.sEmail.Declare
+V.Local.sSQL.Declare
+
+V.Local.sRecID.Set(V.Screen.fmSettings!txtRecId.Text)
+V.Local.sIP.Set(V.Screen.fmSettings!txtIP.Text)
+V.Local.sDB.Set(V.Screen.fmSettings!txtDB.Text)
+V.Local.sUser.Set(V.Screen.fmSettings!txtUser.Text)
+V.Local.sPW.Set(V.Screen.fmSettings!txtPW.Text)
+V.Local.sEName.Set(V.Screen.fmSettings!txtName.Text)
+V.Local.sEmail.Set(V.Screen.fmSettings!txtEmail.Text)
+
+F.Intrinsic.Control.If(V.Local.sIP.Trim,=,"")
+	F.Intrinsic.UI.Msgbox("Please enter a server IP address","Error")
+	F.Intrinsic.Control.ExitSub
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.Control.If(V.Local.sDB.Trim,=,"")
+	F.Intrinsic.UI.Msgbox("Please enter a server database name","Error")
+	F.Intrinsic.Control.ExitSub
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.Control.If(V.Local.sUser.Trim,=,"")
+	F.Intrinsic.UI.Msgbox("Please enter a user name to access the ToolBOSS database","Error")
+	F.Intrinsic.Control.ExitSub
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.Control.If(V.Local.sPW.Trim,=,"")
+	F.Intrinsic.UI.Msgbox("Please enter a password to access the ToolBOSS database","Error")
+	F.Intrinsic.Control.ExitSub
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.Control.If(V.Local.sRecID.Trim,=,"")
+	F.Intrinsic.String.WeakEncryption(V.Local.sPW,V.Local.sPW)
+	
+	F.Intrinsic.String.Build("Insert into GCG_6449_MX (SERVER_IP,DATABASE,USER_ID,CONN_PW,MSG_NAME,MSG_EMAIL) values ('{0}','{1}','{2}','{3}','{4}','{5}')",V.Local.sIP.PSQLFriendly,V.Local.sDB.PSQLFriendly,V.Local.sUser.PSQLFriendly,V.Local.sPW,V.Local.sEName.Trim,V.Local.sEmail,V.Local.sSQL)	
+F.Intrinsic.Control.Else
+	F.Intrinsic.String.WeakEncryption(V.Local.sPW,V.Local.sPW)
+	
+	F.Intrinsic.String.Build("Update GCG_6449_MX set SERVER_IP = '{0}',DATABASE = '{1}',USER_ID = '{2}',CONN_PW = '{3}',MSG_NAME = '{4}',MSG_EMAIL = '{5}' where REC_ID = '{6}'",V.Local.sIP.PSQLFriendly,V.Local.sDB.PSQLFriendly,V.Local.sUser.PSQLFriendly,V.Local.sPW,V.Local.sEName.Trim,V.Local.sEmail,V.Local.sRecID.Long,V.Local.sSQL)
+F.Intrinsic.Control.EndIf
+
+F.ODBC.Connection!conts.OpenCompanyConnection
+	F.ODBC.Connection!conts.Execute(V.Local.sSQL)
+F.ODBC.Connection!conts.Close
+
+Gui.fmSettings.txtRecId.Text("")
+Gui.fmSettings.txtIP.Text("")
+Gui.fmSettings.txtDB.Text("")
+Gui.fmSettings.txtUser.Text("")
+Gui.fmSettings.txtPW.Text("")
+Gui.fmSettings.txtName.Text("")
+Gui.fmSettings.txtEmail.Text("")
+
+F.Intrinsic.Control.CallSub(Main)
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(Error,"SubRoutine",V.Ambient.CurrentSubroutine,"eNumber",V.Ambient.ErrorNumber,"eDescription",V.Ambient.ErrorDescription)
+F.Intrinsic.Control.EndTry
+Program.Sub.cmdSv_Click.End
+
+Program.Sub.cmdDel_Click.Start
+F.Intrinsic.Control.Try
+V.Local.sRecID.Declare
+V.Local.sSQL.Declare
+
+V.Local.sRecID.Set(V.Screen.fmSettings!txtRecId.Text)
+
+F.Intrinsic.String.Build("Delete GCG_6449_MX where REC_ID = '{0}'",V.Local.sRecID.Long,V.Local.sSQL)
+
+F.ODBC.Connection!conts.OpenCompanyConnection
+	F.ODBC.Connection!conts.Execute(V.Local.sSQL)
+F.ODBC.Connection!conts.Close
+
+Gui.fmSettings.txtRecId.Text("")
+Gui.fmSettings.txtIP.Text("")
+Gui.fmSettings.txtDB.Text("")
+Gui.fmSettings.txtUser.Text("")
+Gui.fmSettings.txtPW.Text("")
+Gui.fmSettings.txtName.Text("")
+Gui.fmSettings.txtEmail.Text("")
+
+F.Intrinsic.Control.CallSub(Main)
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(Error,"SubRoutine",V.Ambient.CurrentSubroutine,"eNumber",V.Ambient.ErrorNumber,"eDescription",V.Ambient.ErrorDescription)
+F.Intrinsic.Control.EndTry
+Program.Sub.cmdDel_Click.End
+
+Program.Sub.GsGcSettings_RowCellClick.Start
+F.Intrinsic.Control.Try
+V.Local.sValues.Declare
+V.Local.sPW.Declare
+
+Gui.fmSettings.GsGcSettings.GetRowValues("gvSettings",V.Args.RowIndex,V.Local.sValues)
+F.Intrinsic.String.Split(V.Local.sValues,"*!*",V.Local.sValues)
+
+Gui.fmSettings.txtRecId.Text(V.Local.sValues(0))
+Gui.fmSettings.txtIP.Text(V.Local.sValues(1))
+Gui.fmSettings.txtDB.Text(V.Local.sValues(2))
+Gui.fmSettings.txtUser.Text(V.Local.sValues(3))
+F.Intrinsic.String.WeakDecryption(V.Local.sValues(5),V.Local.sPW)
+Gui.fmSettings.txtPW.Text(V.Local.sPW)
+Gui.fmSettings.txtName.Text(V.Local.sValues(6))
+Gui.fmSettings.txtEmail.Text(V.Local.sValues(7))
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(Error,"SubRoutine",V.Ambient.CurrentSubroutine,"eNumber",V.Ambient.ErrorNumber,"eDescription",V.Ambient.ErrorDescription)
+F.Intrinsic.Control.EndTry
+Program.Sub.GsGcSettings_RowCellClick.End
+
+Program.Sub.fmSettings_UnLoad.Start
+F.Intrinsic.Control.End
+Program.Sub.fmSettings_UnLoad.End
+
+Program.Sub.Error.Start
+V.Local.sError.Declare
+V.Local.iRet.Declare
+V.Local.sSep.Declare
+
+F.Intrinsic.String.Build("-------------------------------------------------------------------------------------",,V.Local.sSep)
+F.Intrinsic.String.Build("({5}-{6}){0}{7}{0}Project: {4}{0}{7}{0}Sub: {1}{0}Error: {2}, {3}", V.Ambient.NewLine, V.Args.SubRoutine, V.Args.eNumber, V.Args.eDescription,V.Caller.ScriptFile,V.Ambient.Date, V.Ambient.Time,V.Local.sSep,V.Local.sError)
+F.Intrinsic.UI.Msgbox(V.Local.sError,"Error",V.Local.iRet)
+Program.Sub.Error.End
+
+Program.Sub.Comments.Start
+${$5$}$3.0.0.0$}$1
+${$6$}$tsmith$}$20211005141211271$}$xqPbj9atw05FglvzeFsZ9cqXP+qvG6tX6jns04nPsyWkMiZLCR5a1gNI/C2K+55U80Pe9igz9gQ=
+Program.Sub.Comments.End
